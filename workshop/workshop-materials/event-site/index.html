@@ -15,6 +15,8 @@
     --accent: #1f5f8b;
     --accent-text: #ffffff;
     --row: #f3f1ec;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
     --max: 960px;
   }
   @media (prefers-color-scheme: dark) {
@@ -27,6 +29,8 @@
       --accent: #7db4dc;
       --accent-text: #0f1a22;
       --row: #24241f;
+      --series-1: #3987e5;
+      --series-2: #d95926;
     }
   }
   * { box-sizing: border-box; }
@@ -101,7 +105,7 @@
   }
   .btn.primary { background: var(--accent); color: var(--accent-text); }
   .btn.secondary { background: transparent; color: var(--accent); }
-  .btn:focus-visible, .tab:focus-visible, summary:focus-visible, .menu-btn:focus-visible, .waitlist-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:focus-visible, .tab:focus-visible, summary:focus-visible, .menu-btn:focus-visible, .waitlist-form input:focus-visible, .seat-bar .seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   #countdown { margin-top: 16px; }
   .notice {
     margin: 24px 0 0; padding: 14px 16px; max-width: 40em;
@@ -117,6 +121,44 @@
     background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 4px;
   }
   .waitlist-form .btn { justify-self: start; }
+
+  /* Seats chart: colours checked with the dataviz palette validator in both modes */
+  .seat-chart { position: relative; margin: 0 0 28px; max-width: 28em; }
+  .seat-chart figcaption { margin-bottom: 10px; }
+  .seat-chart figcaption > span { display: block; }
+  .seat-chart .viz-title { font-weight: 600; }
+  .seat-bar { display: flex; gap: 2px; height: 20px; }
+  .seat-bar .seg { flex: 1 1 0; }
+  .seat-bar .seg:last-child { border-radius: 0 4px 4px 0; }
+  .seat-bar .seg:hover, .seat-bar .seg:focus-visible { filter: brightness(1.1); }
+  .seated { background: var(--series-1); }
+  .waiting { background: var(--series-2); }
+  .seat-key {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px;
+    margin-top: 8px; font-size: .95rem; color: var(--muted);
+  }
+  .seat-key strong { color: var(--text); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+  .viz-tip {
+    position: absolute; z-index: 5; pointer-events: none; white-space: nowrap;
+    padding: 6px 10px; font-size: .9rem; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+  }
+  .viz-tip strong { color: var(--text); margin-right: 4px; }
+  .line-key { display: inline-block; width: 12px; height: 2px; margin-right: 6px; vertical-align: middle; }
+  .seat-chart .viz-table { border: 0; padding: 8px 0 0; }
+  .seat-chart .viz-table summary { font-weight: 400; font-size: .9rem; color: var(--muted); }
+  .seat-chart .viz-table table { margin-top: 8px; }
+  .seat-chart .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .seat-chart tbody th { font-size: inherit; font-weight: 400; color: var(--text); }
+  @media (max-width: 560px) {
+    /* Keep this small table as a table; the schedule's stacked mobile layout doesn't suit it */
+    .seat-chart table { display: table; }
+    .seat-chart thead { display: table-header-group; }
+    .seat-chart tbody { display: table-row-group; }
+    .seat-chart tr { display: table-row; padding: 0; }
+    .seat-chart th, .seat-chart td { display: table-cell; width: auto; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  }
 
   /* Schedule */
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -205,6 +247,22 @@
     <div class="wrap">
       <h2>Join the waitlist</h2>
       <p class="muted">5 people are already on the waitlist. Add your name and we will email you if a seat becomes free.</p>
+      <figure class="seat-chart" id="seat-chart">
+        <figcaption>
+          <span class="viz-title">Who has a seat</span>
+          <span class="viz-sub muted"></span>
+        </figcaption>
+        <div class="seat-bar" role="group" aria-label="Registrations by status"></div>
+        <div class="seat-key"></div>
+        <div class="viz-tip" aria-hidden="true" hidden></div>
+        <details class="viz-table">
+          <summary>Show as table</summary>
+          <table>
+            <thead><tr><th scope="col">Status</th><th scope="col" class="num">People</th><th scope="col" class="num">Share</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </details>
+      </figure>
       <form id="waitlist-form" class="waitlist-form">
         <div>
           <label for="wl-name">Name</label>
@@ -447,6 +505,68 @@
     wlForm.reset();
     wlResult.focus();
   });
+
+  // Seats chart, drawn from the same numbers as the waitlist
+  var seatParts = [
+    { key: "seated", label: "Seated", value: PLACES },
+    { key: "waiting", label: "On the waitlist", value: ALREADY_WAITING }
+  ];
+  var seatChart = document.getElementById("seat-chart");
+  var seatBar = seatChart.querySelector(".seat-bar");
+  var seatKey = seatChart.querySelector(".seat-key");
+  var seatTip = seatChart.querySelector(".viz-tip");
+  var seatRows = seatChart.querySelector("tbody");
+  seatChart.querySelector(".viz-sub").textContent = REGISTERED + " people registered for " + PLACES + " places.";
+
+  function share(n) { return Math.round(n / REGISTERED * 100) + "%"; }
+
+  function showSeatTip(p, x) {
+    seatTip.innerHTML = '<span class="line-key"></span><strong></strong><span></span>';
+    seatTip.children[0].className = "line-key " + p.key;
+    seatTip.children[1].textContent = p.value;
+    seatTip.children[2].textContent = p.label.toLowerCase() + " · " + share(p.value) + " of " + REGISTERED;
+    seatTip.hidden = false;
+    var max = seatChart.clientWidth - seatTip.offsetWidth;
+    seatTip.style.left = Math.max(0, Math.min(max, x - seatTip.offsetWidth / 2)) + "px";
+    seatTip.style.top = (seatBar.offsetTop - seatTip.offsetHeight - 8) + "px";
+  }
+  function hideSeatTip() { seatTip.hidden = true; }
+
+  function addSeatRow(name, value) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = '<th scope="row"></th><td class="num"></td><td class="num"></td>';
+    tr.children[0].textContent = name;
+    tr.children[1].textContent = value;
+    tr.children[2].textContent = share(value);
+    seatRows.appendChild(tr);
+  }
+
+  seatParts.forEach(function (p) {
+    var seg = document.createElement("span");
+    seg.className = "seg " + p.key;
+    seg.style.flexGrow = p.value;
+    seg.tabIndex = 0;
+    seg.setAttribute("role", "img");
+    seg.setAttribute("aria-label", p.label + ": " + p.value + " of " + REGISTERED + " registrations");
+    seg.addEventListener("pointermove", function (e) {
+      showSeatTip(p, e.clientX - seatChart.getBoundingClientRect().left);
+    });
+    seg.addEventListener("focus", function () { showSeatTip(p, seg.offsetLeft + seg.offsetWidth / 2); });
+    seg.addEventListener("pointerleave", hideSeatTip);
+    seg.addEventListener("blur", hideSeatTip);
+    seatBar.appendChild(seg);
+
+    var key = document.createElement("span");
+    key.innerHTML = '<span class="swatch"></span><strong></strong> ';
+    key.children[0].className = "swatch " + p.key;
+    key.children[1].textContent = p.value;
+    key.appendChild(document.createTextNode(p.label.toLowerCase()));
+    seatKey.appendChild(key);
+
+    addSeatRow(p.label, p.value);
+  });
+  addSeatRow("Registered", REGISTERED);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideSeatTip(); });
 
   // Highlight the nav link for the section in view
   var links = document.querySelectorAll("nav a");
