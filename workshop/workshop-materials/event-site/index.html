@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Build Your First AI Assistant</title>
-<meta name="description" content="A one-day community workshop on Saturday 21 November 2026, 9:30 to 16:00, at the community centre.">
+<meta name="description" content="A one-day community workshop on Saturday 21 November 2026, 9:30 to 16:00, at the community centre, Room B.">
 <style>
   :root {
     --bg: #fbfaf7;
@@ -101,13 +101,22 @@
   }
   .btn.primary { background: var(--accent); color: var(--accent-text); }
   .btn.secondary { background: transparent; color: var(--accent); }
-  .btn:focus-visible, .tab:focus-visible, summary:focus-visible, .menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:focus-visible, .tab:focus-visible, summary:focus-visible, .menu-btn:focus-visible, .waitlist-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   #countdown { margin-top: 16px; }
   .notice {
     margin: 24px 0 0; padding: 14px 16px; max-width: 40em;
     background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
   }
   .notice strong { display: block; }
+
+  /* Waitlist */
+  .waitlist-form { display: grid; gap: 16px; max-width: 28em; }
+  .waitlist-form label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .waitlist-form input {
+    width: 100%; font: inherit; padding: 10px 12px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 4px;
+  }
+  .waitlist-form .btn { justify-self: start; }
 
   /* Schedule */
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -157,6 +166,7 @@
     <nav aria-label="Main">
       <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav-list">Menu</button>
       <ul id="nav-list">
+        <li><a href="#waitlist">Waitlist</a></li>
         <li><a href="#schedule">Schedule</a></li>
         <li><a href="#speakers">Speakers</a></li>
         <li><a href="#venue">Venue</a></li>
@@ -179,14 +189,34 @@
         <div><dt>Date</dt><dd>Saturday 21 November 2026</dd></div>
         <div><dt>Time</dt><dd>9:30 to 16:00</dd></div>
         <div><dt>Doors open</dt><dd>9:00</dd></div>
-        <div><dt>Where</dt><dd>Community centre</dd></div>
+        <div><dt>Where</dt><dd>Community centre, Room B</dd></div>
       </dl>
 
       <div class="actions">
-        <a class="btn primary" href="#schedule">See the schedule</a>
+        <a class="btn primary" href="#waitlist">Join the waitlist</a>
+        <a class="btn secondary" href="#schedule">See the schedule</a>
         <button class="btn secondary" type="button" id="add-cal">Add to calendar</button>
       </div>
       <p id="countdown" class="muted" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section id="waitlist">
+    <div class="wrap">
+      <h2>Join the waitlist</h2>
+      <p class="muted">5 people are already on the waitlist. Add your name and we will email you if a seat becomes free.</p>
+      <form id="waitlist-form" class="waitlist-form">
+        <div>
+          <label for="wl-name">Name</label>
+          <input id="wl-name" name="name" required autocomplete="name">
+        </div>
+        <div>
+          <label for="wl-email">Email</label>
+          <input id="wl-email" type="email" name="email" required autocomplete="email">
+        </div>
+        <button class="btn primary" type="submit">Join the waitlist</button>
+      </form>
+      <p id="wl-result" class="notice" role="status" tabindex="-1" hidden></p>
     </div>
   </section>
 
@@ -227,8 +257,7 @@
     <div class="wrap two-col">
       <div>
         <h2>Venue</h2>
-        <p>The workshop takes place at the community centre. Doors open at 9:00 and we start at 9:30.</p>
-        <p class="muted">The exact room will be confirmed by 6 November.</p>
+        <p>The workshop takes place at the community centre, Room B. Doors open at 9:00 and we start at 9:30.</p>
       </div>
       <div>
         <h3>In the room</h3>
@@ -254,11 +283,11 @@
       </details>
       <details>
         <summary>Can I still sign up?</summary>
-        <p>Yes, but the workshop is full, so you will join the waitlist. If a seat becomes free, it will be offered to people on the waitlist.</p>
+        <p>Yes, but the workshop is full, so you will <a href="#waitlist">join the waitlist</a>. If a seat becomes free, it will be offered to people on the waitlist.</p>
       </details>
       <details>
         <summary>How much does it cost?</summary>
-        <p>The ticket price is still being confirmed and will be posted here.</p>
+        <p>Entry is free.</p>
       </details>
       <details>
         <summary>When should I arrive?</summary>
@@ -269,7 +298,7 @@
 </main>
 
 <footer>
-  <div class="wrap">Build Your First AI Assistant · Saturday 21 November 2026 · Community centre</div>
+  <div class="wrap">Build Your First AI Assistant · Saturday 21 November 2026 · Community centre, Room B</div>
 </footer>
 
 <script>
@@ -357,7 +386,7 @@
       "DTSTART:20261121T093000",
       "DTEND:20261121T160000",
       "SUMMARY:Build Your First AI Assistant",
-      "LOCATION:Community centre",
+      "LOCATION:Community centre\\, Room B",
       "DESCRIPTION:Community workshop. Doors open at 9:00.",
       "END:VEVENT",
       "END:VCALENDAR"
@@ -371,6 +400,52 @@
     document.body.appendChild(a);
     a.click();
     a.remove();
+  });
+
+  // Waitlist, kept in this browser until there is a server.
+  // Registrations from registrations-export.csv; those over the places are already waiting.
+  var PLACES = 43; // Room B's 45 seats less 2 kept for the speakers
+  var REGISTERED = 48;
+  var ALREADY_WAITING = REGISTERED - PLACES;
+  var WL_KEY = "workshop-waitlist";
+
+  function loadWaitlist() {
+    try {
+      var list = JSON.parse(localStorage.getItem(WL_KEY));
+      return Array.isArray(list) ? list : [];
+    } catch (e) { return []; }
+  }
+  function saveWaitlist(list) {
+    try { localStorage.setItem(WL_KEY, JSON.stringify(list)); return true; }
+    catch (e) { return false; }
+  }
+
+  var wlForm = document.getElementById("waitlist-form");
+  var wlResult = document.getElementById("wl-result");
+  wlForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = wlForm.elements.name.value.trim();
+    var email = wlForm.elements.email.value.trim();
+    if (!name) { wlForm.elements.name.value = ""; wlForm.reportValidity(); return; }
+
+    var list = loadWaitlist();
+    var key = email.toLowerCase();
+    var existing = -1;
+    list.forEach(function (entry, i) { if (entry.email.toLowerCase() === key) existing = i; });
+
+    var msg;
+    if (existing > -1) {
+      msg = "You're already on the waitlist at number " + (ALREADY_WAITING + existing + 1) + ".";
+    } else {
+      list.push({ name: name, email: email, joined: new Date().toISOString() });
+      msg = "Thanks, " + name + ". You're number " + (ALREADY_WAITING + list.length) +
+        " on the waitlist. We'll email " + email + " if a seat becomes free.";
+      if (!saveWaitlist(list)) msg += " This browser could not save your place, so please keep a note of it.";
+    }
+    wlResult.textContent = msg;
+    wlResult.hidden = false;
+    wlForm.reset();
+    wlResult.focus();
   });
 
   // Highlight the nav link for the section in view
