@@ -1,0 +1,8 @@
+Sessions
+09:30 Welcome and setup
+10:00 What an AI assistant can do for you
+11:00 Hands-on: your first project in Claude
+12:30 Lunch
+13:30 Hands-on: build a small web page with Claude Code
+15:00 Show and tell
+15:45 Wrap-up and next steps
